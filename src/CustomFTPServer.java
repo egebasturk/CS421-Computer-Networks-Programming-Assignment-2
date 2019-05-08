@@ -11,25 +11,37 @@ public class CustomFTPServer
     final static String LF = "\n";
     final static int POSITIVE_RESULT = 1;
     final static int NEGATIVE_RESULT = 1;
-    final static int ftpPort = 22;
+    final static int myFTPPort = 22222;
+    ServerSocket ftpListenerSocket;
+    Socket clientConnection;
 
 
     public CustomFTPServer()
     {
         try {
-            ServerSocket ftpListenerSocket = new ServerSocket();
+            ftpListenerSocket = new ServerSocket(myFTPPort);
+            while (true)
+            {
+                Socket clientSocket = ftpListenerSocket.accept();
+                if (clientSocket != null)
+                {
+                    MyRunnable myRunnable = new MyRunnable(clientSocket);
+                    Thread thread = new Thread(myRunnable);
+                    thread.start();
+                }
+            }
         }catch (IOException ioe)
         {
             ioe.printStackTrace();
         }
     }
 
-    private void handleRequest()
+    /*private void handleRequest()
     {
         MyRunnable myRunnable = new MyRunnable();
         Thread thread = new Thread(myRunnable);
         thread.start();
-    }
+    }*/
 
     OutputStreamWriter outToClient;
     public int sendStringToPort(String str, Socket clientSocket)
@@ -60,9 +72,10 @@ public class CustomFTPServer
 
     private class MyRunnable implements Runnable
     {
-        public MyRunnable()
+        Socket clientSocket;
+        public MyRunnable(Socket clientSocket)
         {
-
+            this.clientSocket = clientSocket;
         }
         @Override
         public void run() {
