@@ -1,17 +1,16 @@
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
+/**
+ * @author Alp Ege Basturk
+ * Custom multi-threaded FTP server
+ * */
+
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.*;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 public class CustomFTPServer
 {
@@ -22,7 +21,7 @@ public class CustomFTPServer
     final static int myFTPPort = 22222;
     final static String localhost = "localhost";
     ServerSocket ftpListenerSocket;
-    Socket clientConnection;
+    Socket serverDataSocket;
     boolean terminateFlag;
 
     public CustomFTPServer()
@@ -30,16 +29,19 @@ public class CustomFTPServer
         terminateFlag = false;
         try {
             ftpListenerSocket = new ServerSocket(myFTPPort);
+            serverDataSocket = new Socket();
+            serverDataSocket.close();
         }catch (IOException ioe)
         {
             ioe.printStackTrace();
         }
+
     }
     public void initServer()
     {
         Thread thread = null;
         ExecutorService executorService = Executors.newCachedThreadPool();
-        while (!terminateFlag)
+        while (true)
         {
             try {
                 Socket clientSocket = ftpListenerSocket.accept();
@@ -54,16 +56,6 @@ public class CustomFTPServer
                 ioe.printStackTrace();
             }
         }
-        executorService.shutdown();
-        try {
-            if (!executorService.awaitTermination(1, TimeUnit.SECONDS)) {
-                executorService.shutdownNow();
-            }
-        }catch (Exception e)
-        {
-            e.printStackTrace();
-        }
-        System.out.println("MAIN: Terminated");
     }
 
     private class MyRunnable implements Runnable
@@ -75,10 +67,13 @@ public class CustomFTPServer
         String command;
         InputStreamReader inputStreamReader;
         BufferedReader bufferedReader;
+        int myDataPortNumber;
 
+        Path currentRelativePath;
         public MyRunnable(Socket clientSocket)
         {
             this.clientControlSocket = clientSocket;
+            currentRelativePath = Paths.get("");
             dataConnectionExistsFlag = false;
             try {
                 inputStreamReader =
@@ -93,71 +88,178 @@ public class CustomFTPServer
         @Override
         public void run() {
             System.out.println("Thread run");
-            createDataConnection();
             while (!terminateFlag)
             {
                 List<String> clientRequestSplittedList = readFromControlPort();
                 if (clientRequestSplittedList != null) {
                     if (clientRequestSplittedList.get(0).equals("QUIT")) {
-                        System.out.println("THREAD: Got QUIT");
-                        terminateFlag = true;
-                        sendSuccessResponse();
+                        handleQUIT();
                     }
-                    else if (clientRequestSplittedList.get(0).equals("CDUP"))
-                    {
-                        System.out.println("THREAD: Got CDUP");
-                        sendSuccessResponse();
+                    else if (clientRequestSplittedList.get(0).equals("PORT")) {
+                        handlePORT(clientRequestSplittedList);
+                    }
+                    else if (clientRequestSplittedList.get(0).equals("CDUP")) {
+                        handleCDUP();
                     }
                     else if (clientRequestSplittedList.get(0).equals("GPRT"))
                     {
-                        sendStringToPort(clientDataSocket.getPort() + CR + LF);
                         sendSuccessResponse();
                     }
-                    else if (clientRequestSplittedList.get(0).equals("NLST"))
-                    {
-                        Path currentRelativePath = Paths.get("");
-                        try (DirectoryStream<Path> stream = Files.newDirectoryStream(currentRelativePath)) {
-                            for (Path file: stream) {
-                                System.out.println(file.getFileName());
-                            }
-                        } catch (IOException | DirectoryIteratorException x) {
-                            // IOException can never be thrown by the iteration.
-                            // In this snippet, it can only be thrown by newDirectoryStream.
-                            System.err.println(x);
-                        }
-                        sendFailResponse();
+                    else if (clientRequestSplittedList.get(0).equals("NLST")) {
+                        handleNLST();
                     }
-                    else if (clientRequestSplittedList.get(0).equals("CWD"))
-                    {
-
+                    else if (clientRequestSplittedList.get(0).equals("CWD")) {
+                        handleCWD(clientRequestSplittedList);
                     }
                     else if (clientRequestSplittedList.get(0).equals("PUT"))
                     {
 
                     }
-                    else if (clientRequestSplittedList.get(0).equals("MKDR"))
-                    {
-
+                    else if (clientRequestSplittedList.get(0).equals("MKDR")) {
+                        handleMKDR(clientRequestSplittedList);
                     }
                     else if (clientRequestSplittedList.get(0).equals("RETR"))
                     {
 
                     }
-                    else if (clientRequestSplittedList.get(0).equals("DELE"))
-                    {
-
+                    else if (clientRequestSplittedList.get(0).equals("DELE")) {
+                        handleDELE(clientRequestSplittedList);
                     }
-                    else if (clientRequestSplittedList.get(0).equals("DDIR"))
-                    {
-
+                    else if (clientRequestSplittedList.get(0).equals("DDIR")) {
+                        handleDDIR(clientRequestSplittedList);
                     }
-                    else
-                    {
+                    else {
                         sendFailResponse();
                     }
                 }
             }
             terminateThread();
+        }
+        private void handleDELE(List<String> clientRequestSplittedList) {
+            Path currentPath = currentRelativePath;
+            Path childPath = currentPath.resolve(currentPath.toString() + "/" + clientRequestSplittedList.get(1));
+            File fileTmp = new File(childPath.toString());
+            if (fileTmp.exists()) {
+                try {
+                    Files.delete(childPath);
+                    sendSuccessResponse();
+                }catch (IOException ioe) {
+                    sendFailResponse();
+                }
+            }
+            else{
+                sendFailResponse();
+            }
+        }
+        private void handleDDIR(List<String> clientRequestSplittedList) {
+            Path currentPath = currentRelativePath;
+            Path childPath = currentPath.resolve(currentPath.toString() + "/" + clientRequestSplittedList.get(1));
+            File fileTmp = new File(childPath.toString());
+            if (fileTmp.exists()) {
+                deleteDirectoryRecursive(childPath);
+                sendSuccessResponse();
+            }
+            else{
+                sendFailResponse();
+            }
+        }
+        private void handleCWD(List<String> clientRequestSplittedList) {
+            Path currentPath = currentRelativePath;
+            Path childPath = currentPath.resolve(currentPath.toString() + "/" + clientRequestSplittedList.get(1));
+            File fileTmp = new File(childPath.toString());
+            if (fileTmp.exists()) {
+                currentRelativePath = childPath;
+                sendSuccessResponse();
+            }
+            else{
+                sendFailResponse();
+            }
+        }
+        private void handleCDUP() {
+            if (currentRelativePath.toString().equals("/")) {
+                sendFailResponse();
+            }
+            else {
+                currentRelativePath = currentRelativePath.getParent();
+            }
+        }
+        private void handleMKDR(List<String> clientRequestSplittedList)
+        {
+            // Directory Logic
+            String returnString = "";
+            Path currentRelativePath = Paths.get("");
+            try {
+                File fileTmp = new File(currentRelativePath.toString() + "/" + clientRequestSplittedList.get(1));
+                if (fileTmp.exists())
+                    sendFailResponse();
+                else {
+                    fileTmp.mkdir();
+                    sendSuccessResponse();
+                }
+
+            } catch (DirectoryIteratorException e) {
+                System.err.println(e);
+            }
+            // End Directory Logic
+        }
+        private void handleQUIT()
+        {
+            System.out.println("THREAD: Got QUIT");
+            terminateFlag = true;
+            sendSuccessResponse();
+        }
+        private void handlePORT(List<String> clientRequestSplittedList)
+        {
+            try {
+                clientDataSocket = new Socket(localhost, Integer.parseInt(clientRequestSplittedList.get(1)));
+                myDataPortNumber = Integer.parseInt(clientRequestSplittedList.get(1));
+                dataConnectionExistsFlag = true;
+                System.out.println("THREAD: Data port created on port " + Integer.parseInt(clientRequestSplittedList.get(1)));
+                sendSuccessResponse();
+            }catch (Exception e)
+            {
+                sendFailResponse();
+                e.printStackTrace();
+            }
+        }
+        private void handleNLST()
+        {
+            //System.out.println("NLST Called");
+            // Directory Logic
+            String returnString = "";
+
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(currentRelativePath)) {
+                boolean preventLastCRLFFlag = false;
+                for (Path file: stream) {
+                    if (!preventLastCRLFFlag)
+                    {
+                        preventLastCRLFFlag = true;
+                    }
+                    else
+                        returnString = returnString + CR + LF;
+                    //System.out.println(file.getFileName());
+                    String fileType = "f";
+                    if (Files.isDirectory(file))
+                        fileType = "d";
+                    returnString = returnString + file.getFileName() + ":"
+                    + fileType;
+                }
+            } catch (IOException | DirectoryIteratorException e) {
+                System.err.println(e);
+            }
+            // End Directory Logic
+            // Send to client
+            try {
+                sendSuccessResponse();
+                if (clientDataSocket.isClosed())
+                    clientDataSocket = new Socket(localhost, myDataPortNumber);
+                sendStringToPort(returnString, clientDataSocket);
+                clientDataSocket.close();
+            }catch (Exception e)
+            {
+
+            }
+            sendSuccessResponse();
         }
         public void terminateThread()
         {
@@ -187,6 +289,7 @@ public class CustomFTPServer
             }catch (IOException ioe)
             {
                 System.out.println("THREAD: Couldn't read from control port");
+                ioe.printStackTrace();
             }
             return null;
         }
@@ -209,15 +312,11 @@ public class CustomFTPServer
                 sendFailResponse();
             }
         }
-        public void GPRT()
-        {
-            command = "GPRT" + CR + LF;
-            sendStringToPort(command);
-        }
-        public int sendStringToPort(String str)
+
+        public int sendStringToPort(String str, Socket socket)
         {
             try {
-                outToClient = new OutputStreamWriter(clientControlSocket.getOutputStream(), "US-ASCII");
+                outToClient = new OutputStreamWriter(socket.getOutputStream(), "US-ASCII");
                 outToClient.write(str, 0, str.length());
                 outToClient.flush();
                 return 0;
@@ -227,11 +326,26 @@ public class CustomFTPServer
                 return NEGATIVE_RESULT;
             }
         }
+        void deleteDirectoryRecursive(Path path) {
+            try {
+                if (Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)) {
+                    try (DirectoryStream<Path> entries = Files.newDirectoryStream(path)) {
+                        for (Path entry : entries) {
+                            deleteDirectoryRecursive(entry);
+                        }
+                    }
+                }
+                Files.delete(path);
+            }catch (IOException ioe)
+            {
+                ioe.printStackTrace();
+            }
+        }
         private void sendSuccessResponse() {
-            sendStringToPort(200 + CR + LF);
+            sendStringToPort(200 + CR + LF, clientControlSocket);
         }
         private void sendFailResponse() {
-            sendStringToPort(400 + CR + LF);
+            sendStringToPort(400 + CR + LF, clientControlSocket);
         }
     }
     public static void main(String args[])
