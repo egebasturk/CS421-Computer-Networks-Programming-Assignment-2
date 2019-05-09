@@ -4,6 +4,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -55,7 +56,7 @@ public class CustomFTPServer
         }
         executorService.shutdown();
         try {
-            if (!executorService.awaitTermination(10, TimeUnit.SECONDS)) {
+            if (!executorService.awaitTermination(1, TimeUnit.SECONDS)) {
                 executorService.shutdownNow();
             }
         }catch (Exception e)
@@ -64,7 +65,6 @@ public class CustomFTPServer
         }
         System.out.println("MAIN: Terminated");
     }
-
 
     private class MyRunnable implements Runnable
     {
@@ -108,13 +108,59 @@ public class CustomFTPServer
                         System.out.println("THREAD: Got CDUP");
                         sendSuccessResponse();
                     }
+                    else if (clientRequestSplittedList.get(0).equals("GPRT"))
+                    {
+                        sendStringToPort(clientDataSocket.getPort() + CR + LF);
+                        sendSuccessResponse();
+                    }
+                    else if (clientRequestSplittedList.get(0).equals("NLST"))
+                    {
+                        Path currentRelativePath = Paths.get("");
+                        try (DirectoryStream<Path> stream = Files.newDirectoryStream(currentRelativePath)) {
+                            for (Path file: stream) {
+                                System.out.println(file.getFileName());
+                            }
+                        } catch (IOException | DirectoryIteratorException x) {
+                            // IOException can never be thrown by the iteration.
+                            // In this snippet, it can only be thrown by newDirectoryStream.
+                            System.err.println(x);
+                        }
+                        sendFailResponse();
+                    }
+                    else if (clientRequestSplittedList.get(0).equals("CWD"))
+                    {
+
+                    }
+                    else if (clientRequestSplittedList.get(0).equals("PUT"))
+                    {
+
+                    }
+                    else if (clientRequestSplittedList.get(0).equals("MKDR"))
+                    {
+
+                    }
+                    else if (clientRequestSplittedList.get(0).equals("RETR"))
+                    {
+
+                    }
+                    else if (clientRequestSplittedList.get(0).equals("DELE"))
+                    {
+
+                    }
+                    else if (clientRequestSplittedList.get(0).equals("DDIR"))
+                    {
+
+                    }
                     else
                     {
-                        terminateFlag = true;
                         sendFailResponse();
                     }
                 }
             }
+            terminateThread();
+        }
+        public void terminateThread()
+        {
             try {
                 clientControlSocket.close();
                 clientControlSocket.close();
@@ -135,11 +181,6 @@ public class CustomFTPServer
         public List<String> readFromControlPort()
         {
             try {
-                /*InputStreamReader inputStreamReader =
-                        new InputStreamReader(clientControlSocket.getInputStream());
-                BufferedReader bufferedReader =
-                        new BufferedReader(inputStreamReader);*/
-
                 String tmp = bufferedReader.readLine();
                 List<String> splittedCommandList = Arrays.asList(tmp.split(" "));
                 return splittedCommandList;
@@ -152,11 +193,6 @@ public class CustomFTPServer
         public void createDataConnection()
         {
             try {
-                /*InputStreamReader inputStreamReader =
-                        new InputStreamReader(clientControlSocket.getInputStream());
-                BufferedReader bufferedReader =
-                        new BufferedReader(inputStreamReader);*/
-
                 String tmp = bufferedReader.readLine();
                 List<String> splittedCommandList = Arrays.asList(tmp.split(" "));
                 String responseCode = splittedCommandList.get(0);
@@ -184,18 +220,6 @@ public class CustomFTPServer
                 outToClient = new OutputStreamWriter(clientControlSocket.getOutputStream(), "US-ASCII");
                 outToClient.write(str, 0, str.length());
                 outToClient.flush();
-
-                /*InputStreamReader inputStreamReader =
-                        new InputStreamReader(clientControlSocket.getInputStream());
-                BufferedReader bufferedReader =
-                        new BufferedReader(inputStreamReader);
-
-                String tmp = bufferedReader.readLine();
-                System.out.println(tmp.split(" ")[0]);
-                int responseCode = Integer.parseInt(tmp.split(" ")[0]);
-                if (responseCode == 400)
-                    System.out.println("CODE 400 Received");
-                return responseCode;*/
                 return 0;
             } catch (IOException e)
             {
