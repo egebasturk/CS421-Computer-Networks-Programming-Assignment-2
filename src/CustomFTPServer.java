@@ -1,6 +1,9 @@
 /**
  * @author Alp Ege Basturk
  * Custom multi-threaded FTP server
+ *
+ * GPRT does not work correctly
+ * PUT is not implemented
  * */
 
 import java.io.*;
@@ -35,8 +38,8 @@ public class CustomFTPServer
             int rand =  random.nextInt(40000);
             serverDataPort = rand + 20000;
             ftpListenerSocket = new ServerSocket(myFTPPort);
-            serverDataSocket = new Socket(localhost, serverDataPort);
-            serverDataSocket.close();
+            //serverDataSocket = new Socket(localhost, serverDataPort);
+            //serverDataSocket.close();
         }catch (IOException ioe)
         {
             ioe.printStackTrace();
@@ -111,6 +114,7 @@ public class CustomFTPServer
                         System.out.println(currentAbsolutePath.toAbsolutePath().toString());
                     }
                     else if (clientRequestSplittedList.get(0).equals("GPRT")) {
+                        // **** Implementation is Buggy, probably wrong ****
                         handleGPRT();
                     }
                     else if (clientRequestSplittedList.get(0).equals("NLST")) {
@@ -122,6 +126,7 @@ public class CustomFTPServer
                     }
                     else if (clientRequestSplittedList.get(0).equals("PUT"))
                     {
+                        // **** Not implemented ****
                         System.out.println("PUT NOT IMPLEMENTED");
                     }
                     else if (clientRequestSplittedList.get(0).equals("MKDR")) {
@@ -359,6 +364,7 @@ public class CustomFTPServer
             catch (NullPointerException ne)
             {
                 ne.printStackTrace();
+                terminateFlag = true;
                 try {
                     clientDataSocket.close();
                 }catch (IOException ioe)
