@@ -375,25 +375,6 @@ public class CustomFTPServer
             }
             return null;
         }
-        public void createDataConnection()
-        {
-            try {
-                String tmp = bufferedReader.readLine();
-                List<String> splittedCommandList = Arrays.asList(tmp.split(" "));
-                String responseCode = splittedCommandList.get(0);
-
-                if (responseCode.equals("PORT")) {
-                    clientDataSocket = new Socket(localhost, Integer.parseInt(splittedCommandList.get(1)));
-                    dataConnectionExistsFlag = true;
-                    System.out.println("THREAD: Data port created on port " + Integer.parseInt(splittedCommandList.get(1)));
-                    sendSuccessResponse();
-                }
-            }catch (IOException ioe)
-            {
-                System.out.println("THREAD: Cannot Create Data Connection");
-                sendFailResponse();
-            }
-        }
 
         public int sendStringToPort(String str, Socket socket)
         {
