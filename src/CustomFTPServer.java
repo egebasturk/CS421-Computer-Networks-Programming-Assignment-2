@@ -15,33 +15,32 @@ public class CustomFTPServer
     ServerSocket ftpListenerSocket;
     Socket clientConnection;
 
-
     public CustomFTPServer()
     {
         try {
             ftpListenerSocket = new ServerSocket(myFTPPort);
-            while (true)
-            {
-                Socket clientSocket = ftpListenerSocket.accept();
-                if (clientSocket != null)
-                {
-                    MyRunnable myRunnable = new MyRunnable(clientSocket);
-                    Thread thread = new Thread(myRunnable);
-                    thread.start();
-                }
-            }
         }catch (IOException ioe)
         {
             ioe.printStackTrace();
         }
     }
-
-    /*private void handleRequest()
+    public void initServer()
     {
-        MyRunnable myRunnable = new MyRunnable();
-        Thread thread = new Thread(myRunnable);
-        thread.start();
-    }*/
+        while (true)
+        {
+            try {
+                Socket clientSocket = ftpListenerSocket.accept();
+                if (clientSocket != null) {
+                    MyRunnable myRunnable = new MyRunnable(clientSocket);
+                    Thread thread = new Thread(myRunnable);
+                    thread.start();
+                }
+            }catch (IOException ioe)
+            {
+                ioe.printStackTrace();
+            }
+        }
+    }
 
     OutputStreamWriter outToClient;
     public int sendStringToPort(String str, Socket clientSocket)
@@ -79,7 +78,12 @@ public class CustomFTPServer
         }
         @Override
         public void run() {
-
+            System.out.println("Thread run");
         }
+    }
+    public static void main(String args[])
+    {
+        CustomFTPServer customFTPServer = new CustomFTPServer();
+        customFTPServer.initServer();
     }
 }
