@@ -24,14 +24,15 @@ public class CustomFTPServer
     final static int NEGATIVE_RESULT = 1;
     int myFTPPort;
     int serverDataPort;
-    final static String localhost = "localhost";
+    String localhost;
     ServerSocket ftpListenerSocket;
     Socket serverDataSocket;
     boolean terminateFlag;
 
-    public CustomFTPServer(int ftpPort)
+    public CustomFTPServer(String localhost ,int ftpPort)
     {
         myFTPPort = ftpPort;
+        this.localhost = localhost;
         terminateFlag = false;
         try {
             Random random = new Random();
@@ -413,7 +414,7 @@ public class CustomFTPServer
     }
     public static void main(String args[])
     {
-        CustomFTPServer customFTPServer = new CustomFTPServer(Integer.parseInt(args[0]));
+        CustomFTPServer customFTPServer = new CustomFTPServer(args[0], Integer.parseInt(args[1]));
         customFTPServer.initServer();
         System.exit(0);
     }
