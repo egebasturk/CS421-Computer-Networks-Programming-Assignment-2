@@ -9,6 +9,7 @@ import java.net.Socket;
 import java.nio.file.*;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -19,6 +20,7 @@ public class CustomFTPServer
     final static int POSITIVE_RESULT = 1;
     final static int NEGATIVE_RESULT = 1;
     int myFTPPort;
+    int serverDataPort;
     final static String localhost = "localhost";
     ServerSocket ftpListenerSocket;
     Socket serverDataSocket;
@@ -29,8 +31,11 @@ public class CustomFTPServer
         myFTPPort = ftpPort;
         terminateFlag = false;
         try {
+            Random random = new Random();
+            int rand =  random.nextInt(40000);
+            serverDataPort = rand + 20000;
             ftpListenerSocket = new ServerSocket(myFTPPort);
-            serverDataSocket = new Socket();
+            serverDataSocket = new Socket(localhost, serverDataPort);
             serverDataSocket.close();
         }catch (IOException ioe)
         {
@@ -105,9 +110,8 @@ public class CustomFTPServer
                         handleCDUP();
                         System.out.println(currentAbsolutePath.toAbsolutePath().toString());
                     }
-                    else if (clientRequestSplittedList.get(0).equals("GPRT"))
-                    {
-                        sendSuccessResponse();
+                    else if (clientRequestSplittedList.get(0).equals("GPRT")) {
+                        handleGPRT();
                     }
                     else if (clientRequestSplittedList.get(0).equals("NLST")) {
                         handleNLST();
@@ -118,14 +122,13 @@ public class CustomFTPServer
                     }
                     else if (clientRequestSplittedList.get(0).equals("PUT"))
                     {
-
+                        System.out.println("PUT NOT IMPLEMENTED");
                     }
                     else if (clientRequestSplittedList.get(0).equals("MKDR")) {
                         handleMKDR(clientRequestSplittedList);
                     }
-                    else if (clientRequestSplittedList.get(0).equals("RETR"))
-                    {
-
+                    else if (clientRequestSplittedList.get(0).equals("RETR")) {
+                        handleRETR(clientRequestSplittedList);
                     }
                     else if (clientRequestSplittedList.get(0).equals("DELE")) {
                         handleDELE(clientRequestSplittedList);
@@ -139,6 +142,59 @@ public class CustomFTPServer
                 }
             }
             terminateThread();
+        }
+        private void handleRETR(List<String> clientRequestSplittedList) {
+            try {
+                sendSuccessResponse();
+                if (clientDataSocket.isClosed())
+                    clientDataSocket = new Socket(localhost, myDataPortNumber);
+
+                File file = new File(currentAbsolutePath.toString() + "/" + clientRequestSplittedList.get(1));
+                // Get the size of the file
+                int length = (int)file.length();
+                byte[] bytes = new byte[length];
+                InputStream fileInputStream = new FileInputStream(file);
+                OutputStream outputStream = clientDataSocket.getOutputStream();
+
+                int count;
+                while ((count = fileInputStream.read(bytes)) > 0) {
+                    byte[] bytes1 = new byte[count];
+                    outputStream.write(bytes1,0, 2);
+                    outputStream.write(bytes, 0, count);
+                }
+                outputStream.flush();
+                outputStream.close();
+                fileInputStream.close();
+                clientDataSocket.close();
+
+
+            }catch (IOException ioe)
+            {
+                ioe.printStackTrace();
+            }
+
+        }
+        private void handleGPRT() {
+            try {
+                sendSuccessResponse();
+                if (clientDataSocket.isClosed())
+                    clientDataSocket = new Socket(localhost, myDataPortNumber);
+
+                OutputStream outputStream = clientDataSocket.getOutputStream();
+
+                byte[] bytes1 = new byte[myDataPortNumber];
+                outputStream.write(bytes1,0, bytes1.length);
+
+                outputStream.flush();
+                outputStream.close();
+                clientDataSocket.close();
+
+
+            }catch (IOException ioe)
+            {
+                ioe.printStackTrace();
+                terminateFlag = true;
+            }
         }
         private void handleDELE(List<String> clientRequestSplittedList) {
             Path currentPath = currentAbsolutePath;
@@ -186,6 +242,7 @@ public class CustomFTPServer
             }
             else {
                 currentAbsolutePath = currentAbsolutePath.getParent();
+                sendSuccessResponse();
             }
         }
         private void handleMKDR(List<String> clientRequestSplittedList)
@@ -264,7 +321,7 @@ public class CustomFTPServer
             {
 
             }
-            sendSuccessResponse();
+            //sendSuccessResponse();
         }
         public void terminateThread()
         {
@@ -278,8 +335,10 @@ public class CustomFTPServer
             System.out.println("THREAD Terminating");
 
             try {
-                clientControlSocket.close();
-                clientDataSocket.close();
+                if (!clientControlSocket.isClosed())
+                    clientControlSocket.close();
+                if (!clientDataSocket.isClosed())
+                    clientDataSocket.close();
             }catch (Exception e)
             {
                 e.printStackTrace();
@@ -296,6 +355,17 @@ public class CustomFTPServer
                 System.out.println("THREAD: Couldn't read from control port");
                 terminateFlag = true;
                 ioe.printStackTrace();
+            }
+            catch (NullPointerException ne)
+            {
+                ne.printStackTrace();
+                try {
+                    clientDataSocket.close();
+                }catch (IOException ioe)
+                {
+
+                }
+                return null;
             }
             return null;
         }
