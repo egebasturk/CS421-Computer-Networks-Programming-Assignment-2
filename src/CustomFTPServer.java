@@ -18,14 +18,15 @@ public class CustomFTPServer
     final static String LF = "\n";
     final static int POSITIVE_RESULT = 1;
     final static int NEGATIVE_RESULT = 1;
-    final static int myFTPPort = 22222;
+    int myFTPPort;
     final static String localhost = "localhost";
     ServerSocket ftpListenerSocket;
     Socket serverDataSocket;
     boolean terminateFlag;
 
-    public CustomFTPServer()
+    public CustomFTPServer(int ftpPort)
     {
+        myFTPPort = ftpPort;
         terminateFlag = false;
         try {
             ftpListenerSocket = new ServerSocket(myFTPPort);
@@ -69,11 +70,13 @@ public class CustomFTPServer
         BufferedReader bufferedReader;
         int myDataPortNumber;
 
-        Path currentRelativePath;
+        Path currentAbsolutePath;
+        Path rootAbsolutePath;
         public MyRunnable(Socket clientSocket)
         {
             this.clientControlSocket = clientSocket;
-            currentRelativePath = Paths.get("");
+            currentAbsolutePath = Paths.get("").toAbsolutePath();
+            rootAbsolutePath = Paths.get("").toAbsolutePath();
             dataConnectionExistsFlag = false;
             try {
                 inputStreamReader =
@@ -100,7 +103,7 @@ public class CustomFTPServer
                     }
                     else if (clientRequestSplittedList.get(0).equals("CDUP")) {
                         handleCDUP();
-                        System.out.println(currentRelativePath.toString());
+                        System.out.println(currentAbsolutePath.toAbsolutePath().toString());
                     }
                     else if (clientRequestSplittedList.get(0).equals("GPRT"))
                     {
@@ -111,7 +114,7 @@ public class CustomFTPServer
                     }
                     else if (clientRequestSplittedList.get(0).equals("CWD")) {
                         handleCWD(clientRequestSplittedList);
-                        System.out.println(currentRelativePath.toString());
+                        System.out.println(currentAbsolutePath.toAbsolutePath().toString());
                     }
                     else if (clientRequestSplittedList.get(0).equals("PUT"))
                     {
@@ -138,7 +141,7 @@ public class CustomFTPServer
             terminateThread();
         }
         private void handleDELE(List<String> clientRequestSplittedList) {
-            Path currentPath = currentRelativePath;
+            Path currentPath = currentAbsolutePath;
             Path childPath = currentPath.resolve(currentPath.toString() + "/" + clientRequestSplittedList.get(1));
             File fileTmp = new File(childPath.toString());
             if (fileTmp.exists()) {
@@ -154,7 +157,7 @@ public class CustomFTPServer
             }
         }
         private void handleDDIR(List<String> clientRequestSplittedList) {
-            Path currentPath = currentRelativePath;
+            Path currentPath = currentAbsolutePath;
             Path childPath = currentPath.resolve(currentPath.toString() + "/" + clientRequestSplittedList.get(1));
             File fileTmp = new File(childPath.toString());
             if (fileTmp.exists()) {
@@ -166,11 +169,11 @@ public class CustomFTPServer
             }
         }
         private void handleCWD(List<String> clientRequestSplittedList) {
-            Path currentPath = currentRelativePath;
-            Path childPath = currentPath.resolve(currentPath.toString() + "/" + clientRequestSplittedList.get(1));
-            File fileTmp = new File(childPath.toString());
+            Path currentPath = currentAbsolutePath;
+            currentPath = currentPath.resolve(clientRequestSplittedList.get(1));
+            File fileTmp = new File(currentPath.toString());
             if (fileTmp.exists()) {
-                currentRelativePath = childPath;
+                currentAbsolutePath = currentAbsolutePath.resolve(clientRequestSplittedList.get(1));
                 sendSuccessResponse();
             }
             else{
@@ -178,20 +181,20 @@ public class CustomFTPServer
             }
         }
         private void handleCDUP() {
-            if (currentRelativePath.toString().equals("/")) {
+            if (currentAbsolutePath.toString().equals(rootAbsolutePath.toString())) {
                 sendFailResponse();
             }
             else {
-                currentRelativePath = currentRelativePath.getParent();
+                currentAbsolutePath = currentAbsolutePath.getParent();
             }
         }
         private void handleMKDR(List<String> clientRequestSplittedList)
         {
             // Directory Logic
-            String returnString = "";
-            Path currentRelativePath = Paths.get("");
+            Path currentPath = currentAbsolutePath;
+            currentPath = currentPath.resolve(clientRequestSplittedList.get(1));
             try {
-                File fileTmp = new File(currentRelativePath.toString() + "/" + clientRequestSplittedList.get(1));
+                File fileTmp = new File(currentPath.toString());
                 if (fileTmp.exists())
                     sendFailResponse();
                 else {
@@ -228,9 +231,9 @@ public class CustomFTPServer
         {
             //System.out.println("NLST Called");
             // Directory Logic
-            String returnString = "";
+            String returnString = "xx";// There is a 16 bit problem at the start it seems
 
-            try (DirectoryStream<Path> stream = Files.newDirectoryStream(currentRelativePath)) {
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(currentAbsolutePath)) {
                 boolean preventLastCRLFFlag = false;
                 for (Path file: stream) {
                     if (!preventLastCRLFFlag)
@@ -291,6 +294,7 @@ public class CustomFTPServer
             }catch (IOException ioe)
             {
                 System.out.println("THREAD: Couldn't read from control port");
+                terminateFlag = true;
                 ioe.printStackTrace();
             }
             return null;
@@ -352,7 +356,7 @@ public class CustomFTPServer
     }
     public static void main(String args[])
     {
-        CustomFTPServer customFTPServer = new CustomFTPServer();
+        CustomFTPServer customFTPServer = new CustomFTPServer(Integer.parseInt(args[0]));
         customFTPServer.initServer();
         System.exit(0);
     }
