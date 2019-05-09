@@ -100,6 +100,7 @@ public class CustomFTPServer
                     }
                     else if (clientRequestSplittedList.get(0).equals("CDUP")) {
                         handleCDUP();
+                        System.out.println(currentRelativePath.toString());
                     }
                     else if (clientRequestSplittedList.get(0).equals("GPRT"))
                     {
@@ -110,6 +111,7 @@ public class CustomFTPServer
                     }
                     else if (clientRequestSplittedList.get(0).equals("CWD")) {
                         handleCWD(clientRequestSplittedList);
+                        System.out.println(currentRelativePath.toString());
                     }
                     else if (clientRequestSplittedList.get(0).equals("PUT"))
                     {
